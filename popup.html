@@ -103,6 +103,33 @@
       text-decoration: underline;
     }
 
+    .actions {
+      margin-bottom: 16px;
+    }
+
+    .action-btn {
+      width: 100%;
+      padding: 10px 14px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.2s;
+    }
+
+    .action-btn:hover {
+      background: #1557b0;
+    }
+
+    .action-btn:disabled {
+      background: #a8c7fa;
+      cursor: not-allowed;
+    }
+
     .loading {
       text-align: center;
       color: #666;
@@ -118,6 +145,10 @@
 
   <div id="loading" class="loading">
     Loading enhancements...
+  </div>
+
+  <div id="actions" style="display: none;" class="actions">
+    <button id="showPrevTimecard" class="action-btn">&#8592; Show Previous Timecard</button>
   </div>
 
   <div id="enhancements" style="display: none;"></div>

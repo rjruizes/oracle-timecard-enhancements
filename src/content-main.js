@@ -11,6 +11,7 @@
   manager.registerEnhancement(new WeekendShadingEnhancement());
   manager.registerEnhancement(new AlternateLineShadingEnhancement());
   manager.registerEnhancement(new DynamicRedLineEnhancement());
+  manager.registerEnhancement(new PreviousTimecardEnhancement());
 
   // Initialize the manager
   manager.init().catch(error => {
@@ -67,7 +68,19 @@
         } else {
           sendResponse({ success: false, error: 'Alternate row shading enhancement not found' });
         }
-        break;        default:
+        break;
+
+      case 'showPreviousTimecardData':
+        const prevTimecard = manager.enhancements.get('previous-timecard');
+        if (prevTimecard) {
+          prevTimecard.showModal(request.data);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'Previous timecard enhancement not found' });
+        }
+        break;
+
+      default:
           sendResponse({ success: false, error: 'Unknown action' });
       }
   });

@@ -22,12 +22,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         }
 
-        // Hide loading and show enhancements
+        // Hide loading and show actions + enhancements
         loadingEl.style.display = 'none';
+        document.getElementById('actions').style.display = 'block';
         enhancementsEl.style.display = 'block';
 
         // Render enhancements
         renderEnhancements(response.enhancements);
+
+        // Wire up previous timecard button
+        const prevBtn = document.getElementById('showPrevTimecard');
+        prevBtn.addEventListener('click', async () => {
+          prevBtn.disabled = true;
+          prevBtn.textContent = 'Loading…';
+          try {
+            const data = await fetchPreviousTimecardFromPage(tab.id);
+            await chrome.tabs.sendMessage(tab.id, { action: 'showPreviousTimecardData', data });
+            window.close();
+          } catch (err) {
+            prevBtn.textContent = '← Show Previous Timecard';
+            prevBtn.disabled = false;
+            alert(`Could not load previous timecard: ${err.message}`);
+          }
+        });
 
     } catch (error) {
         console.error('Error loading popup:', error);
@@ -109,4 +126,47 @@ async function toggleEnhancement(name, enabled, toggleEl) {
         console.error('Error toggling enhancement:', error);
         alert('Error toggling enhancement. Please refresh the page and try again.');
     }
+}
+
+// Runs a self-contained function in the page's MAIN world so that Oracle's own
+// fetch middleware (which injects the Bearer token) is active when we call fetch().
+async function fetchPreviousTimecardFromPage(tabId) {
+    const [result] = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func: () => {
+            // Find the timeCardEntryDetails URL Oracle already fetched for this page
+            const entry = performance.getEntriesByType('resource')
+                .find(e => e.name.includes('/timeCardEntryDetails?'));
+            if (!entry) {
+                return { error: 'API URL not found. Please reload the timecard page and try again.' };
+            }
+
+            const url = new URL(entry.name);
+            const finder = url.searchParams.get('finder');
+            const match = finder && finder.match(/AsOfDate=([^,&]+)/);
+            if (!match) {
+                return { error: 'Could not parse AsOfDate from API URL.' };
+            }
+
+            // Shift back 20 days — safely lands in the prior semi-monthly period
+            const d = new Date(match[1]);
+            d.setDate(d.getDate() - 20);
+            const newAsOfDate = d.toISOString().slice(0, 10) + 'T00:00:00';
+            url.searchParams.set('finder', finder.replace(/AsOfDate=[^,&]+/, `AsOfDate=${newAsOfDate}`));
+
+            // Calling window.fetch here goes through Oracle's own auth middleware,
+            // which adds the Authorization: Bearer header automatically.
+            return fetch(url.toString(), {
+                credentials: 'include',
+                headers: { accept: 'application/json', 'accept-language': 'en' }
+            })
+                .then(r => r.ok ? r.json().then(data => ({ data })) : { error: `API returned ${r.status}` })
+                .catch(err => ({ error: err.message }));
+        }
+    });
+
+    if (result.result?.error) throw new Error(result.result.error);
+    if (!result.result?.data) throw new Error('No data returned from API.');
+    return result.result.data;
 }
