@@ -11,7 +11,8 @@
   manager.registerEnhancement(new WeekendShadingEnhancement());
   manager.registerEnhancement(new AlternateLineShadingEnhancement());
   manager.registerEnhancement(new DynamicRedLineEnhancement());
-  manager.registerEnhancement(new PreviousTimecardEnhancement());
+  // Previous timecard is action-only; registered directly, not via manager
+  window._previousTimecardEnhancement = new PreviousTimecardEnhancement();
 
   // Initialize the manager
   manager.init().catch(error => {
@@ -71,13 +72,8 @@
         break;
 
       case 'showPreviousTimecardData':
-        const prevTimecard = manager.enhancements.get('previous-timecard');
-        if (prevTimecard) {
-          prevTimecard.showModal(request.data);
-          sendResponse({ success: true });
-        } else {
-          sendResponse({ success: false, error: 'Previous timecard enhancement not found' });
-        }
+        window._previousTimecardEnhancement.showModal(request.data);
+        sendResponse({ success: true });
         break;
 
       default:

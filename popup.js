@@ -128,41 +128,76 @@ async function toggleEnhancement(name, enabled, toggleEl) {
     }
 }
 
-// Runs a self-contained function in the page's MAIN world so that Oracle's own
-// fetch middleware (which injects the Bearer token) is active when we call fetch().
+// Runs a self-contained async function in the page's MAIN world so that Oracle's
+// own fetch middleware (which injects the Bearer token) is active when we call fetch().
 async function fetchPreviousTimecardFromPage(tabId) {
     const [result] = await chrome.scripting.executeScript({
         target: { tabId },
         world: 'MAIN',
-        func: () => {
-            // Find the timeCardEntryDetails URL Oracle already fetched for this page
+        func: async () => {
+            const headers = { accept: 'application/json', 'accept-language': 'en' };
+
+            // Find any timeCardEntryDetails request Oracle already made for this page
             const entry = performance.getEntriesByType('resource')
-                .find(e => e.name.includes('/timeCardEntryDetails?'));
+                .findLast(e => e.name.includes('/timeCardEntryDetails'));
             if (!entry) {
                 return { error: 'API URL not found. Please reload the timecard page and try again.' };
             }
 
-            const url = new URL(entry.name);
-            const finder = url.searchParams.get('finder');
-            const match = finder && finder.match(/AsOfDate=([^,&]+)/);
-            if (!match) {
-                return { error: 'Could not parse AsOfDate from API URL.' };
+            const currentUrl = new URL(entry.name);
+            const finder = currentUrl.searchParams.get('finder') || '';
+            const asOfDateMatch = finder.match(/AsOfDate=([^,&]+)/);
+
+            let prevUrl;
+
+            if (asOfDateMatch) {
+                // Fast path: AsOfDate is already in the URL — shift back 20 days
+                const d = new Date(asOfDateMatch[1]);
+                d.setDate(d.getDate() - 20);
+                const newDate = d.toISOString().slice(0, 10) + 'T00:00:00';
+                currentUrl.searchParams.set('finder', finder.replace(/AsOfDate=[^,&]+/, `AsOfDate=${newDate}`));
+                prevUrl = currentUrl.toString();
+            } else {
+                // Slow path: page fetched by timecard ID — fetch current card first to
+                // get StartDate and PersonId, then build a findByPersonIdAndDate URL.
+                const r = await fetch(entry.name, { credentials: 'include', headers });
+                if (!r.ok) return { error: `Could not read current timecard: API returned ${r.status}` };
+
+                const current = await r.json();
+                const item = current?.items?.[0];
+                const startDate = item?.StartDate?.slice(0, 10);
+                const personId = item?.PersonId;
+
+                if (!startDate || !personId) {
+                    return { error: 'Could not read period start date from current timecard.' };
+                }
+
+                // 1 day before the period start lands safely in the prior period
+                const d = new Date(startDate);
+                d.setDate(d.getDate() - 1);
+                const prevDate = d.toISOString().slice(0, 10) + 'T00:00:00';
+
+                // Build a findByPersonIdAndDate URL using the same API base path
+                const base = new URL(entry.name);
+                base.pathname = base.pathname.split('/timeCardEntryDetails')[0] + '/timeCardEntryDetails';
+                base.search = '';
+                base.searchParams.set('expand', [
+                    'timeCardLayouts', 'timeCards', 'timeCardLayouts.timeCardFields',
+                    'timeCards.publicHolidays', 'timeCards.timeEntries', 'timeCards.approvalTasks',
+                    'timeCards.timeEntries.timeCardFieldValues', 'timeCards.emptyEntries',
+                    'timeCards.emptyEntries.timeCardFieldValues', 'timeCards.messages',
+                    'timeCards.timeEntries.messages', 'timeCards.scheduledHours',
+                    'timeCards.changeRequests', 'timeCards.timeEntries.changeRequests'
+                ].join(','));
+                base.searchParams.set('finder', `findByPersonIdAndDate;UserContext=WORKER,PersonId=${personId},AsOfDate=${prevDate}`);
+                base.searchParams.set('limit', '5000');
+                base.searchParams.set('onlyData', 'true');
+                prevUrl = base.toString();
             }
 
-            // Shift back 20 days — safely lands in the prior semi-monthly period
-            const d = new Date(match[1]);
-            d.setDate(d.getDate() - 20);
-            const newAsOfDate = d.toISOString().slice(0, 10) + 'T00:00:00';
-            url.searchParams.set('finder', finder.replace(/AsOfDate=[^,&]+/, `AsOfDate=${newAsOfDate}`));
-
-            // Calling window.fetch here goes through Oracle's own auth middleware,
-            // which adds the Authorization: Bearer header automatically.
-            return fetch(url.toString(), {
-                credentials: 'include',
-                headers: { accept: 'application/json', 'accept-language': 'en' }
-            })
-                .then(r => r.ok ? r.json().then(data => ({ data })) : { error: `API returned ${r.status}` })
-                .catch(err => ({ error: err.message }));
+            const r = await fetch(prevUrl, { credentials: 'include', headers });
+            if (!r.ok) return { error: `API returned ${r.status}` };
+            return { data: await r.json() };
         }
     });
 
