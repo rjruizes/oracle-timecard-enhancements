@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           prevBtn.disabled = true;
           prevBtn.textContent = 'Loading…';
           try {
-            const data = await fetchPreviousTimecardFromPage(tab.id);
-            await chrome.tabs.sendMessage(tab.id, { action: 'showPreviousTimecardData', data });
+            const { prevData, currentData } = await fetchPreviousTimecardFromPage(tab.id);
+            await chrome.tabs.sendMessage(tab.id, { action: 'showPreviousTimecardData', prevData, currentData });
             window.close();
           } catch (err) {
             prevBtn.textContent = '← Show Previous Timecard';
@@ -137,9 +137,14 @@ async function fetchPreviousTimecardFromPage(tabId) {
         func: async () => {
             const headers = { accept: 'application/json', 'accept-language': 'en' };
 
-            // Find any timeCardEntryDetails request Oracle already made for this page
+            // Track URLs fetched by this extension so findLast doesn't pick them up
+            // on subsequent clicks and keep going further back each time.
+            if (!window.__ote_fetchedUrls) window.__ote_fetchedUrls = new Set();
+
+            // Find any timeCardEntryDetails request Oracle already made for this page,
+            // excluding URLs our extension has fetched.
             const entry = performance.getEntriesByType('resource')
-                .findLast(e => e.name.includes('/timeCardEntryDetails'));
+                .findLast(e => e.name.includes('/timeCardEntryDetails') && !window.__ote_fetchedUrls.has(e.name));
             if (!entry) {
                 return { error: 'API URL not found. Please reload the timecard page and try again.' };
             }
@@ -147,6 +152,11 @@ async function fetchPreviousTimecardFromPage(tabId) {
             const currentUrl = new URL(entry.name);
             const finder = currentUrl.searchParams.get('finder') || '';
             const asOfDateMatch = finder.match(/AsOfDate=([^,&]+)/);
+
+            // Always fetch the current timecard data first
+            const currentResp = await fetch(entry.name, { credentials: 'include', headers });
+            if (!currentResp.ok) return { error: `Could not read current timecard: API returned ${currentResp.status}` };
+            const currentData = await currentResp.json();
 
             let prevUrl;
 
@@ -158,13 +168,9 @@ async function fetchPreviousTimecardFromPage(tabId) {
                 currentUrl.searchParams.set('finder', finder.replace(/AsOfDate=[^,&]+/, `AsOfDate=${newDate}`));
                 prevUrl = currentUrl.toString();
             } else {
-                // Slow path: page fetched by timecard ID — fetch current card first to
-                // get StartDate and PersonId, then build a findByPersonIdAndDate URL.
-                const r = await fetch(entry.name, { credentials: 'include', headers });
-                if (!r.ok) return { error: `Could not read current timecard: API returned ${r.status}` };
-
-                const current = await r.json();
-                const item = current?.items?.[0];
+                // Slow path: use the already-fetched current data to get StartDate and PersonId,
+                // then build a findByPersonIdAndDate URL for the previous period.
+                const item = currentData?.items?.[0];
                 const startDate = item?.StartDate?.slice(0, 10);
                 const personId = item?.PersonId;
 
@@ -195,13 +201,14 @@ async function fetchPreviousTimecardFromPage(tabId) {
                 prevUrl = base.toString();
             }
 
+            window.__ote_fetchedUrls.add(prevUrl);
             const r = await fetch(prevUrl, { credentials: 'include', headers });
             if (!r.ok) return { error: `API returned ${r.status}` };
-            return { data: await r.json() };
+            return { prevData: await r.json(), currentData };
         }
     });
 
     if (result.result?.error) throw new Error(result.result.error);
-    if (!result.result?.data) throw new Error('No data returned from API.');
-    return result.result.data;
+    if (!result.result?.prevData) throw new Error('No data returned from API.');
+    return result.result;
 }

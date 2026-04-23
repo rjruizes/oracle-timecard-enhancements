@@ -72,7 +72,7 @@
         break;
 
       case 'showPreviousTimecardData':
-        window._previousTimecardEnhancement.showModal(request.data);
+        window._previousTimecardEnhancement.showModal(request.prevData, request.currentData);
         sendResponse({ success: true });
         break;
 
