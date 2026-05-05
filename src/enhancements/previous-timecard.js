@@ -243,13 +243,13 @@ class PreviousTimecardEnhancement extends Enhancement {
         max-width: min(95vw, 1600px);
         width: 95vw;
       }
-      .ote-sticky-proj {
+      .ote-12m-table .ote-sticky-proj {
         position: sticky; left: 0; z-index: 1;
         background: inherit;
         min-width: 140px; max-width: 200px;
         border-right: 1px solid #e5e7eb;
       }
-      .ote-sticky-task {
+      .ote-12m-table .ote-sticky-task {
         position: sticky; left: 140px; z-index: 1;
         background: inherit;
         min-width: 120px; max-width: 180px;
@@ -263,7 +263,7 @@ class PreviousTimecardEnhancement extends Enhancement {
       }
       .ote-12m-table thead .ote-sticky-proj,
       .ote-12m-table thead .ote-sticky-task {
-        z-index: 2;
+        z-index: 3;
         background: #f5f6f8;
       }
       .ote-12m-table tfoot .ote-sticky-proj {
@@ -271,7 +271,7 @@ class PreviousTimecardEnhancement extends Enhancement {
       }
       .ote-12m-num-th {
         text-align: right;
-        padding: 10px 10px;
+        padding: 10px;
         font-size: 12px; font-weight: 600; color: #4b5563;
         background: #f5f6f8;
         border-bottom: 1px solid #e5e7eb;
@@ -282,9 +282,13 @@ class PreviousTimecardEnhancement extends Enhancement {
         color: #166534;
       }
       .ote-12m-table td {
-        padding: 10px 10px;
+        padding: 10px;
         font-size: 13px;
         border-bottom: 1px solid #eef0f3;
+      }
+      .ote-12m-table td.ote-num-col {
+        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+        font-variant-numeric: tabular-nums;
       }
       .ote-12m-table tbody tr.ote-alt td { background: #fafbfc; }
       .ote-12m-table tbody tr:hover td { background: #f0f6ff; }
@@ -528,7 +532,7 @@ class PreviousTimecardEnhancement extends Enhancement {
 
     panel.innerHTML = `
       ${warningHtml}
-      <div style="overflow-x: auto; max-height: 65vh; overflow-y: auto;">
+      <div style="overflow-x: auto;">
         <table class="ote-12m-table" style="width: 100%; border-collapse: collapse; white-space: nowrap;">
           <thead>
             <tr>
