@@ -162,9 +162,14 @@ async function fetchPreviousTimecardFromPage(tabId) {
             let prevUrl;
 
             if (asOfDateMatch) {
-                // Fast path: AsOfDate is already in the URL — shift back 20 days
-                const d = new Date(asOfDateMatch[1]);
-                d.setDate(d.getDate() - 20);
+                // Fast path: AsOfDate is in the URL — set it to 1 day before the current
+                // period's StartDate so we land exactly in the prior pay period.
+                const startDate = currentData?.items?.[0]?.StartDate?.slice(0, 10);
+                if (!startDate) {
+                    return { error: 'Could not read period start date from current timecard.' };
+                }
+                const d = new Date(startDate);
+                d.setDate(d.getDate() - 1);
                 const newDate = d.toISOString().slice(0, 10) + 'T00:00:00';
                 currentUrl.searchParams.set('finder', finder.replace(/AsOfDate=[^,&]+/, `AsOfDate=${newDate}`));
                 prevUrl = currentUrl.toString();
