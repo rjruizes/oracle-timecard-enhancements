@@ -265,6 +265,11 @@ async function injectFetch12MonthsHelper(tabId, currentData) {
             window.addEventListener('message', async (event) => {
                 if (event.source !== window || event.data?.type !== 'ote-fetch-12m') return;
 
+                if (!event.data.startDate || !event.data.personId) {
+                    window.postMessage({ type: 'ote-12m-error', periods: [], message: 'Missing startDate or personId in message' }, window.location.origin);
+                    return;
+                }
+
                 const periods = [];
                 let currentStart = event.data.startDate;
 
