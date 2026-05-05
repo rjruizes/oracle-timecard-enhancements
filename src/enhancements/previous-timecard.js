@@ -255,6 +255,12 @@ class PreviousTimecardEnhancement extends Enhancement {
         min-width: 120px; max-width: 180px;
         border-right: 1px solid #e5e7eb;
       }
+      .ote-12m-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f5f6f8;
+      }
       .ote-12m-table thead .ote-sticky-proj,
       .ote-12m-table thead .ote-sticky-task {
         z-index: 2;
