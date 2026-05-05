@@ -215,85 +215,85 @@ async function fetchPreviousTimecardFromPage(tabId) {
 }
 
 async function injectFetch12MonthsHelper(tabId, currentData) {
-  const item = currentData?.items?.[0];
-  const startDate = item?.StartDate?.slice(0, 10);
-  const personId = item?.PersonId;
-  if (!startDate || !personId) return; // can't inject without these
+    const item = currentData?.items?.[0];
+    const startDate = item?.StartDate?.slice(0, 10);
+    const personId = item?.PersonId;
+    if (!startDate || !personId) return; // can't inject without these
 
-  // Build the API base URL from the most recent timeCardEntryDetails resource entry
-  // so the helper knows which host/path to use for subsequent fetches.
-  const [urlResult] = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: 'MAIN',
-    func: () => {
-      const entry = performance.getEntriesByType('resource')
-        .findLast(e => e.name.includes('/timeCardEntryDetails'));
-      if (!entry) return null;
-      const u = new URL(entry.name);
-      return u.origin + u.pathname.split('/timeCardEntryDetails')[0] + '/timeCardEntryDetails';
-    }
-  });
-  const baseUrl = urlResult?.result;
-  if (!baseUrl) return;
-
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    world: 'MAIN',
-    func: (baseUrl, personId, startDate) => {
-      if (window.__ote_12m_injected) return;
-      window.__ote_12m_injected = true;
-
-      const TOTAL = 24;
-      const headers = { accept: 'application/json', 'accept-language': 'en' };
-
-      function buildPeriodUrl(personId, asOfDate) {
-        const base = new URL(baseUrl);
-        base.searchParams.set('expand', [
-          'timeCardLayouts', 'timeCards', 'timeCardLayouts.timeCardFields',
-          'timeCards.publicHolidays', 'timeCards.timeEntries', 'timeCards.approvalTasks',
-          'timeCards.timeEntries.timeCardFieldValues', 'timeCards.emptyEntries',
-          'timeCards.emptyEntries.timeCardFieldValues', 'timeCards.messages',
-          'timeCards.timeEntries.messages', 'timeCards.scheduledHours',
-          'timeCards.changeRequests', 'timeCards.timeEntries.changeRequests'
-        ].join(','));
-        base.searchParams.set('finder', `findByPersonIdAndDate;UserContext=WORKER,PersonId=${personId},AsOfDate=${asOfDate}`);
-        base.searchParams.set('limit', '5000');
-        base.searchParams.set('onlyData', 'true');
-        return base.toString();
-      }
-
-      window.addEventListener('message', async (event) => {
-        if (event.source !== window || event.data?.type !== 'ote-fetch-12m') return;
-
-        const periods = [];
-        let currentStart = event.data.startDate;
-
-        try {
-          for (let i = 0; i < TOTAL; i++) {
-            const d = new Date(currentStart);
-            d.setDate(d.getDate() - 1);
-            const asOfDate = d.toISOString().slice(0, 10) + 'T00:00:00';
-            const url = buildPeriodUrl(event.data.personId, asOfDate);
-
-            const resp = await fetch(url, { credentials: 'include', headers });
-            if (!resp.ok) throw new Error(`API returned ${resp.status} on period ${i + 1}`);
-            const data = await resp.json();
-
-            const periodItem = data?.items?.[0];
-            if (!periodItem) break; // no more history
-
-            const pStart = periodItem.StartDate?.slice(0, 10);
-            periods.push({ data, startDate: pStart });
-            currentStart = pStart;
-
-            window.postMessage({ type: 'ote-12m-progress', done: i + 1, total: TOTAL }, '*');
-          }
-          window.postMessage({ type: 'ote-12m-done', periods }, '*');
-        } catch (err) {
-          window.postMessage({ type: 'ote-12m-error', periods, message: err.message }, '*');
+    // Build the API base URL from the most recent timeCardEntryDetails resource entry
+    // so the helper knows which host/path to use for subsequent fetches.
+    const [urlResult] = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func: () => {
+            const entry = performance.getEntriesByType('resource')
+                .findLast(e => e.name.includes('/timeCardEntryDetails'));
+            if (!entry) return null;
+            const u = new URL(entry.name);
+            return u.origin + u.pathname.split('/timeCardEntryDetails')[0] + '/timeCardEntryDetails';
         }
-      });
-    },
-    args: [baseUrl, personId, startDate]
-  });
+    });
+    const baseUrl = urlResult?.result;
+    if (!baseUrl) return;
+
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func: (baseUrl, personId) => {
+            if (window.__ote_12m_injected) return;
+            window.__ote_12m_injected = true;
+
+            const TOTAL = 24;
+            const headers = { accept: 'application/json', 'accept-language': 'en' };
+
+            function buildPeriodUrl(personId, asOfDate) {
+                const base = new URL(baseUrl);
+                base.searchParams.set('expand', [
+                    'timeCardLayouts', 'timeCards', 'timeCardLayouts.timeCardFields',
+                    'timeCards.publicHolidays', 'timeCards.timeEntries', 'timeCards.approvalTasks',
+                    'timeCards.timeEntries.timeCardFieldValues', 'timeCards.emptyEntries',
+                    'timeCards.emptyEntries.timeCardFieldValues', 'timeCards.messages',
+                    'timeCards.timeEntries.messages', 'timeCards.scheduledHours',
+                    'timeCards.changeRequests', 'timeCards.timeEntries.changeRequests'
+                ].join(','));
+                base.searchParams.set('finder', `findByPersonIdAndDate;UserContext=WORKER,PersonId=${personId},AsOfDate=${asOfDate}`);
+                base.searchParams.set('limit', '5000');
+                base.searchParams.set('onlyData', 'true');
+                return base.toString();
+            }
+
+            window.addEventListener('message', async (event) => {
+                if (event.source !== window || event.data?.type !== 'ote-fetch-12m') return;
+
+                const periods = [];
+                let currentStart = event.data.startDate;
+
+                try {
+                    for (let i = 0; i < TOTAL; i++) {
+                        const d = new Date(currentStart);
+                        d.setDate(d.getDate() - 1);
+                        const asOfDate = d.toISOString().slice(0, 10) + 'T00:00:00';
+                        const url = buildPeriodUrl(event.data.personId, asOfDate);
+
+                        const resp = await fetch(url, { credentials: 'include', headers });
+                        if (!resp.ok) throw new Error(`API returned ${resp.status} on period ${i + 1}`);
+                        const data = await resp.json();
+
+                        const periodItem = data?.items?.[0];
+                        if (!periodItem) break; // no more history
+
+                        const pStart = periodItem.StartDate?.slice(0, 10);
+                        periods.push({ data, startDate: pStart });
+                        currentStart = pStart;
+
+                        window.postMessage({ type: 'ote-12m-progress', done: i + 1, total: TOTAL }, window.location.origin);
+                    }
+                    window.postMessage({ type: 'ote-12m-done', periods }, window.location.origin);
+                } catch (err) {
+                    window.postMessage({ type: 'ote-12m-error', periods, message: err.message }, window.location.origin);
+                }
+            });
+        },
+        args: [baseUrl, personId]
+    });
 }
