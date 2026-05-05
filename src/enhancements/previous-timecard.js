@@ -110,47 +110,54 @@ class PreviousTimecardEnhancement extends Enhancement {
           </div>
           <button id="ote-prev-close" title="Close">&#x2715;</button>
         </div>
-        <div id="ote-prev-body">
-          <table id="ote-prev-table">
-            <thead>
-              <tr>
-                <th class="ote-text-col ote-th">
-                  <div class="ote-th-inner ote-th-left">Project</div>
-                </th>
-                <th class="ote-text-col ote-th">
-                  <div class="ote-th-inner ote-th-left">Task</div>
-                </th>
-                <th class="ote-th">
-                  <div class="ote-th-inner">
-                    <span>Previous</span>
-                    <span class="ote-th-date">${prevRange}</span>
-                  </div>
-                </th>
-                <th class="ote-th ote-cur-head">
-                  <div class="ote-th-inner">
-                    <span class="ote-cur-label">Current</span>
-                    <span class="ote-th-date">${curRange}</span>
-                  </div>
-                </th>
-                <th class="ote-th">
-                  <div class="ote-th-inner">
-                    <span>Combined</span>
-                    <span class="ote-th-date">Both periods</span>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-            <tfoot>
-              <tr>
-                <td class="ote-text-col ote-total-cell" colspan="2"><strong>Total</strong></td>
-                <td class="ote-num-col ote-total-cell"><strong>${this.fmt(prevTotal)}</strong></td>
-                <td class="ote-num-col ote-total-cell ote-cur-col"><strong>${this.fmt(curTotal)}</strong></td>
-                <td class="ote-num-col ote-total-cell ote-combined"><strong>${this.fmt(combTotal)}</strong></td>
-              </tr>
-            </tfoot>
-          </table>
+        <div id="ote-tabs">
+          <button class="ote-tab ote-tab-active" data-tab="prev-cur">Previous vs Current</button>
+          <button class="ote-tab" data-tab="last-12">Last 12 Months</button>
         </div>
+        <div id="ote-panel-prev-cur" class="ote-panel">
+          <div id="ote-prev-body">
+            <table id="ote-prev-table">
+              <thead>
+                <tr>
+                  <th class="ote-text-col ote-th">
+                    <div class="ote-th-inner ote-th-left">Project</div>
+                  </th>
+                  <th class="ote-text-col ote-th">
+                    <div class="ote-th-inner ote-th-left">Task</div>
+                  </th>
+                  <th class="ote-th">
+                    <div class="ote-th-inner">
+                      <span>Previous</span>
+                      <span class="ote-th-date">${prevRange}</span>
+                    </div>
+                  </th>
+                  <th class="ote-th ote-cur-head">
+                    <div class="ote-th-inner">
+                      <span class="ote-cur-label">Current</span>
+                      <span class="ote-th-date">${curRange}</span>
+                    </div>
+                  </th>
+                  <th class="ote-th">
+                    <div class="ote-th-inner">
+                      <span>Combined</span>
+                      <span class="ote-th-date">Both periods</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+              <tfoot>
+                <tr>
+                  <td class="ote-text-col ote-total-cell" colspan="2"><strong>Total</strong></td>
+                  <td class="ote-num-col ote-total-cell"><strong>${this.fmt(prevTotal)}</strong></td>
+                  <td class="ote-num-col ote-total-cell ote-cur-col"><strong>${this.fmt(curTotal)}</strong></td>
+                  <td class="ote-num-col ote-total-cell ote-combined"><strong>${this.fmt(combTotal)}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div id="ote-panel-last-12" class="ote-panel" style="display:none"></div>
       </div>`;
 
     const style = document.createElement('style');
@@ -249,6 +256,30 @@ class PreviousTimecardEnhancement extends Enhancement {
         padding-top: 12px;
       }
       .ote-empty { text-align: center; color: #9aa0a6; }
+      #ote-tabs {
+        display: flex;
+        border-bottom: 2px solid #e5e7eb;
+        background: #f5f6f8;
+        padding: 0 22px;
+      }
+      .ote-tab {
+        background: none; border: none; cursor: pointer;
+        padding: 10px 16px;
+        font-size: 13px; font-weight: 500; color: #6b7280;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: color 0.15s;
+      }
+      .ote-tab:hover { color: #1f2328; }
+      .ote-tab.ote-tab-active {
+        color: #1f2328; font-weight: 600;
+        border-bottom-color: #3c4a5c;
+      }
+      .ote-panel { display: block; }
+      #ote-panel-last-12 {
+        max-height: 65vh;
+        overflow-y: auto;
+      }
     `;
 
     document.head.appendChild(style);
@@ -257,6 +288,18 @@ class PreviousTimecardEnhancement extends Enhancement {
 
     document.getElementById('ote-prev-close').addEventListener('click', () => this.closeModal());
     document.getElementById('ote-prev-overlay').addEventListener('click', () => this.closeModal());
+    document.querySelectorAll('.ote-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.ote-tab').forEach(t => t.classList.remove('ote-tab-active'));
+        tab.classList.add('ote-tab-active');
+        const panel = tab.dataset.tab;
+        const dialog = document.getElementById('ote-prev-dialog');
+        document.getElementById('ote-panel-prev-cur').style.display = panel === 'prev-cur' ? '' : 'none';
+        document.getElementById('ote-panel-last-12').style.display = panel === 'last-12' ? '' : 'none';
+        dialog.classList.toggle('ote-dialog-wide', panel === 'last-12');
+        if (panel === 'last-12') this._onLast12TabActivated();
+      });
+    });
     document.addEventListener('keydown', this._escHandler = (e) => {
       if (e.key === 'Escape') this.closeModal();
     });
@@ -269,6 +312,10 @@ class PreviousTimecardEnhancement extends Enhancement {
       document.removeEventListener('keydown', this._escHandler);
       this._escHandler = null;
     }
+  }
+
+  _onLast12TabActivated() {
+    // Lazy fetch — implemented in Task 4
   }
 
   showError(msg) {
