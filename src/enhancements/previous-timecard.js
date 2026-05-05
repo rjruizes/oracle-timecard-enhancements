@@ -243,6 +243,49 @@ class PreviousTimecardEnhancement extends Enhancement {
         max-width: min(95vw, 1600px);
         width: 95vw;
       }
+      .ote-sticky-proj {
+        position: sticky; left: 0; z-index: 1;
+        background: inherit;
+        min-width: 140px; max-width: 200px;
+        border-right: 1px solid #e5e7eb;
+      }
+      .ote-sticky-task {
+        position: sticky; left: 140px; z-index: 1;
+        background: inherit;
+        min-width: 120px; max-width: 180px;
+        border-right: 1px solid #e5e7eb;
+      }
+      .ote-12m-table thead .ote-sticky-proj,
+      .ote-12m-table thead .ote-sticky-task {
+        z-index: 2;
+        background: #f5f6f8;
+      }
+      .ote-12m-table tfoot .ote-sticky-proj {
+        background: #fafbfc;
+      }
+      .ote-12m-num-th {
+        text-align: right;
+        padding: 10px 10px;
+        font-size: 12px; font-weight: 600; color: #4b5563;
+        background: #f5f6f8;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+      }
+      .ote-12m-cur-month {
+        background: #f0faf0 !important;
+        color: #166534;
+      }
+      .ote-12m-table td {
+        padding: 10px 10px;
+        font-size: 13px;
+        border-bottom: 1px solid #eef0f3;
+      }
+      .ote-12m-table tbody tr.ote-alt td { background: #fafbfc; }
+      .ote-12m-table tbody tr:hover td { background: #f0f6ff; }
+      .ote-12m-monospace {
+        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+      }
       #ote-prev-header {
         display: flex;
         align-items: flex-start;
@@ -431,6 +474,72 @@ class PreviousTimecardEnhancement extends Enhancement {
     doneEl.textContent  = done;
     totalEl.textContent = total;
     barEl.style.width   = Math.round((done / total) * 100) + '%';
+  }
+
+  render12MonthTable({ monthKeys, monthLabels, rows }, errorMsg) {
+    const panel = document.getElementById('ote-panel-last-12');
+    if (!panel) return;
+
+    // Compute per-month totals
+    const monthTotals = monthKeys.map((_, mi) =>
+      rows.reduce((sum, r) => sum + r.monthHours[mi], 0)
+    );
+
+    const currentMonthIdx = monthKeys.length - 1;
+
+    // Build header cells for each month
+    const monthHeaders = monthLabels.map((label, i) => {
+      const isCurrent = i === currentMonthIdx;
+      return `<th class="ote-th ote-12m-num-th${isCurrent ? ' ote-12m-cur-month' : ''}">${label}</th>`;
+    }).join('');
+
+    // Build data rows
+    const dataRows = rows.length
+      ? rows.map((r, ri) => {
+          const cells = r.monthHours.map((h, i) => {
+            const isCurrent = i === currentMonthIdx;
+            return `<td class="ote-num-col${isCurrent ? ' ote-12m-cur-month' : ''}">${h > 0 ? this.fmt(h) : '—'}</td>`;
+          }).join('');
+          return `<tr class="${ri % 2 === 1 ? 'ote-alt' : ''}">
+            <td class="ote-text-col ote-sticky-proj">${r.project}</td>
+            <td class="ote-text-col ote-sticky-task">${r.task}</td>
+            ${cells}
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="${2 + monthKeys.length}" class="ote-empty">No entries found</td></tr>`;
+
+    // Build totals row
+    const totalCells = monthTotals.map((t, i) => {
+      const isCurrent = i === currentMonthIdx;
+      return `<td class="ote-num-col ote-total-cell ote-12m-monospace${isCurrent ? ' ote-12m-cur-month' : ''}"><strong>${this.fmt(t)}</strong></td>`;
+    }).join('');
+
+    const warningHtml = errorMsg
+      ? `<div style="padding: 8px 22px; background: #fff3cd; color: #856404; font-size: 12px; border-bottom: 1px solid #e5e7eb;">
+           ⚠ Could not load all 12 months — showing ${monthKeys.length} month${monthKeys.length !== 1 ? 's' : ''} retrieved. (${errorMsg})
+         </div>`
+      : '';
+
+    panel.innerHTML = `
+      ${warningHtml}
+      <div style="overflow-x: auto; max-height: 65vh; overflow-y: auto;">
+        <table class="ote-12m-table" style="width: 100%; border-collapse: collapse; white-space: nowrap;">
+          <thead>
+            <tr>
+              <th class="ote-text-col ote-th ote-sticky-proj" style="text-align:left;">Project</th>
+              <th class="ote-text-col ote-th ote-sticky-task" style="text-align:left;">Task</th>
+              ${monthHeaders}
+            </tr>
+          </thead>
+          <tbody>${dataRows}</tbody>
+          <tfoot>
+            <tr>
+              <td class="ote-text-col ote-total-cell ote-sticky-proj" colspan="2"><strong>Total</strong></td>
+              ${totalCells}
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
   }
 
   showError(msg) {
