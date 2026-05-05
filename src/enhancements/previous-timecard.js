@@ -275,7 +275,6 @@ class PreviousTimecardEnhancement extends Enhancement {
         color: #1f2328; font-weight: 600;
         border-bottom-color: #3c4a5c;
       }
-      .ote-panel { display: block; }
       #ote-panel-last-12 {
         max-height: 65vh;
         overflow-y: auto;
@@ -288,14 +287,16 @@ class PreviousTimecardEnhancement extends Enhancement {
 
     document.getElementById('ote-prev-close').addEventListener('click', () => this.closeModal());
     document.getElementById('ote-prev-overlay').addEventListener('click', () => this.closeModal());
-    document.querySelectorAll('.ote-tab').forEach(tab => {
+    const panelPrevCur = document.getElementById('ote-panel-prev-cur');
+    const panelLast12  = document.getElementById('ote-panel-last-12');
+    const dialog       = document.getElementById('ote-prev-dialog');
+    modal.querySelectorAll('.ote-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        document.querySelectorAll('.ote-tab').forEach(t => t.classList.remove('ote-tab-active'));
+        modal.querySelectorAll('.ote-tab').forEach(t => t.classList.remove('ote-tab-active'));
         tab.classList.add('ote-tab-active');
         const panel = tab.dataset.tab;
-        const dialog = document.getElementById('ote-prev-dialog');
-        document.getElementById('ote-panel-prev-cur').style.display = panel === 'prev-cur' ? '' : 'none';
-        document.getElementById('ote-panel-last-12').style.display = panel === 'last-12' ? '' : 'none';
+        panelPrevCur.style.display = panel === 'prev-cur' ? '' : 'none';
+        panelLast12.style.display  = panel === 'last-12'  ? '' : 'none';
         dialog.classList.toggle('ote-dialog-wide', panel === 'last-12');
         if (panel === 'last-12') this._onLast12TabActivated();
       });
