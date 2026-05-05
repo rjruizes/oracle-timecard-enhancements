@@ -100,7 +100,7 @@ class PreviousTimecardEnhancement extends Enhancement {
     const rows = Array.from(allKeys)
       .map(key => {
         const [project, task] = key.split('\0');
-        const monthHours = sortedKeys.map(mk => monthMap.get(mk)?.get(key) || 0);
+        const monthHours = sortedKeys.map(mk => monthMap.get(mk).get(key) || 0);
         return { project, task, monthHours };
       })
       .sort((a, b) => a.project.localeCompare(b.project) || a.task.localeCompare(b.task));
