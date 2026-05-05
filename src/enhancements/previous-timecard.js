@@ -130,6 +130,11 @@ class PreviousTimecardEnhancement extends Enhancement {
     const curStop   = curItem?.StopDate?.slice(0, 10)  || '';
     const curRange  = curStart && curStop ? `${curStart} – ${curStop}` : 'Current period';
 
+    this._12mPersonId  = curItem?.PersonId  || null;
+    this._12mStartDate = curItem?.StartDate?.slice(0, 10) || null;
+    this._12mLoaded    = false;
+    this._12mMsgHandler = null;
+
     const rows = this.buildRows(prevData, currentData);
     const prevTotal = rows.reduce((s, r) => s + r.previous, 0);
     const curTotal  = rows.reduce((s, r) => s + r.current,  0);
@@ -232,6 +237,10 @@ class PreviousTimecardEnhancement extends Enhancement {
         font-size: 14px;
         color: #1f2328;
         overflow: hidden;
+      }
+      #ote-prev-dialog.ote-dialog-wide {
+        max-width: min(95vw, 1600px);
+        width: 95vw;
       }
       #ote-prev-header {
         display: flex;
@@ -361,10 +370,64 @@ class PreviousTimecardEnhancement extends Enhancement {
       document.removeEventListener('keydown', this._escHandler);
       this._escHandler = null;
     }
+    if (this._12mMsgHandler) {
+      window.removeEventListener('message', this._12mMsgHandler);
+      this._12mMsgHandler = null;
+    }
   }
 
   _onLast12TabActivated() {
-    // Lazy fetch — implemented in Task 4
+    if (this._12mLoaded) return; // already fetched this session
+    if (!this._12mPersonId || !this._12mStartDate) {
+      document.getElementById('ote-panel-last-12').innerHTML =
+        '<p style="padding:24px;color:#9aa0a6;text-align:center;">Could not determine person or period — please reload the timecard.</p>';
+      return;
+    }
+
+    this.showLoadingState();
+
+    this._12mMsgHandler = (event) => {
+      if (event.source !== window) return;
+      const { type, done, total, periods, message } = event.data || {};
+
+      if (type === 'ote-12m-progress') {
+        this.updateProgress(done, total);
+
+      } else if (type === 'ote-12m-done' || type === 'ote-12m-error') {
+        window.removeEventListener('message', this._12mMsgHandler);
+        this._12mMsgHandler = null;
+        this._12mLoaded = true;
+
+        const monthData = this.buildMonthRows(periods || []);
+        this.render12MonthTable(monthData, type === 'ote-12m-error' ? message : null);
+      }
+    };
+
+    window.addEventListener('message', this._12mMsgHandler);
+    window.postMessage({ type: 'ote-fetch-12m', personId: this._12mPersonId, startDate: this._12mStartDate }, window.location.origin);
+  }
+
+  showLoadingState() {
+    document.getElementById('ote-panel-last-12').innerHTML = `
+      <div id="ote-12m-loading" style="padding: 32px 22px; text-align: center;">
+        <div style="color: #4b5563; margin-bottom: 12px; font-size: 14px;">
+          Fetching historical data&hellip; <strong><span id="ote-12m-done">0</span> / <span id="ote-12m-total">24</span></strong>
+        </div>
+        <div style="background: #e5e7eb; border-radius: 4px; height: 8px; overflow: hidden;">
+          <div id="ote-12m-bar" style="background: #3c4a5c; width: 0%; height: 100%; transition: width 0.25s;"></div>
+        </div>
+        <div style="color: #9aa0a6; font-size: 12px; margin-top: 10px;">This may take a few seconds</div>
+      </div>`;
+  }
+
+  updateProgress(done, total) {
+    const doneEl  = document.getElementById('ote-12m-done');
+    const barEl   = document.getElementById('ote-12m-bar');
+    const totalEl = document.getElementById('ote-12m-total');
+    if (!doneEl) return;
+    doneEl.textContent  = done;
+    totalEl.textContent = total;
+    barEl.style.width   = Math.round((done / total) * 100) + '%';
   }
 
   showError(msg) {
