@@ -130,10 +130,11 @@ class PreviousTimecardEnhancement extends Enhancement {
     const curStop   = curItem?.StopDate?.slice(0, 10)  || '';
     const curRange  = curStart && curStop ? `${curStart} – ${curStop}` : 'Current period';
 
-    this._12mPersonId  = curItem?.PersonId  || null;
-    this._12mStartDate = curItem?.StartDate?.slice(0, 10) || null;
-    this._12mLoaded    = false;
-    this._12mMsgHandler = null;
+    this._12mPersonId     = curItem?.PersonId  || null;
+    this._12mStartDate    = curItem?.StartDate?.slice(0, 10) || null;
+    this._12mLoaded       = false;
+    this._12mMsgHandler   = null;
+    this._12mSessionToken = null;
 
     const rows = this.buildRows(prevData, currentData);
     const prevTotal = rows.reduce((s, r) => s + r.previous, 0);
@@ -384,10 +385,12 @@ class PreviousTimecardEnhancement extends Enhancement {
       return;
     }
 
+    this._12mSessionToken = Math.random().toString(36).slice(2);
     this.showLoadingState();
 
     this._12mMsgHandler = (event) => {
       if (event.source !== window) return;
+      if (event.data?.token !== this._12mSessionToken) return;
       const { type, done, total, periods, message } = event.data || {};
 
       if (type === 'ote-12m-progress') {
@@ -404,7 +407,7 @@ class PreviousTimecardEnhancement extends Enhancement {
     };
 
     window.addEventListener('message', this._12mMsgHandler);
-    window.postMessage({ type: 'ote-fetch-12m', personId: this._12mPersonId, startDate: this._12mStartDate }, window.location.origin);
+    window.postMessage({ type: 'ote-fetch-12m', personId: this._12mPersonId, startDate: this._12mStartDate, token: this._12mSessionToken }, window.location.origin);
   }
 
   showLoadingState() {

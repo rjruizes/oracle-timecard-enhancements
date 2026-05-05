@@ -272,6 +272,7 @@ async function injectFetch12MonthsHelper(tabId, currentData) {
 
                 const periods = [];
                 let currentStart = event.data.startDate;
+                const sessionToken = event.data.token || null;
 
                 try {
                     for (let i = 0; i < TOTAL; i++) {
@@ -291,11 +292,11 @@ async function injectFetch12MonthsHelper(tabId, currentData) {
                         periods.push({ data, startDate: pStart });
                         currentStart = pStart;
 
-                        window.postMessage({ type: 'ote-12m-progress', done: i + 1, total: TOTAL }, window.location.origin);
+                        window.postMessage({ type: 'ote-12m-progress', done: i + 1, total: TOTAL, token: sessionToken }, window.location.origin);
                     }
-                    window.postMessage({ type: 'ote-12m-done', periods }, window.location.origin);
+                    window.postMessage({ type: 'ote-12m-done', periods, token: sessionToken }, window.location.origin);
                 } catch (err) {
-                    window.postMessage({ type: 'ote-12m-error', periods, message: err.message }, window.location.origin);
+                    window.postMessage({ type: 'ote-12m-error', periods, message: err.message, token: sessionToken }, window.location.origin);
                 }
             });
         },
