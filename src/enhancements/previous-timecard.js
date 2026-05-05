@@ -64,6 +64,54 @@ class PreviousTimecardEnhancement extends Enhancement {
     return (n || 0).toLocaleString('en-US', { maximumFractionDigits: 1 });
   }
 
+  fmtMonthLabel(key) {
+    const [year, month] = key.split('-');
+    const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return d.toLocaleString('en-US', { month: 'short' }) + " '" + year.slice(2);
+  }
+
+  buildMonthRows(periods) {
+    // Group pay periods by calendar month (YYYY-MM) using the period's StartDate
+    const monthMap = new Map(); // "YYYY-MM" -> Map("project\0task" -> hours)
+
+    for (const { data, startDate } of periods) {
+      const monthKey = startDate ? startDate.slice(0, 7) : null;
+      if (!monthKey) continue;
+
+      const totals = this.parseTotalsMap(data);
+      if (!monthMap.has(monthKey)) monthMap.set(monthKey, new Map());
+      const month = monthMap.get(monthKey);
+
+      for (const [key, hours] of totals) {
+        month.set(key, (month.get(key) || 0) + hours);
+      }
+    }
+
+    // Sort months oldest → newest
+    const sortedKeys = Array.from(monthMap.keys()).sort();
+
+    // Build unified set of all project/task keys across all months
+    const allKeys = new Set();
+    for (const totals of monthMap.values()) {
+      for (const key of totals.keys()) allKeys.add(key);
+    }
+
+    // Build rows: one per project/task combo
+    const rows = Array.from(allKeys)
+      .map(key => {
+        const [project, task] = key.split('\0');
+        const monthHours = sortedKeys.map(mk => monthMap.get(mk)?.get(key) || 0);
+        return { project, task, monthHours };
+      })
+      .sort((a, b) => a.project.localeCompare(b.project) || a.task.localeCompare(b.task));
+
+    return {
+      monthKeys: sortedKeys,
+      monthLabels: sortedKeys.map(k => this.fmtMonthLabel(k)),
+      rows
+    };
+  }
+
   showModal(prevData, currentData) {
     this.closeModal();
 
