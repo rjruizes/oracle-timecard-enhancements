@@ -266,7 +266,7 @@ async function injectFetch12MonthsHelper(tabId, currentData) {
                 if (event.source !== window || event.data?.type !== 'ote-fetch-12m') return;
 
                 if (!event.data.startDate || !event.data.personId) {
-                    window.postMessage({ type: 'ote-12m-error', periods: [], message: 'Missing startDate or personId in message' }, window.location.origin);
+                    window.postMessage({ type: 'ote-12m-error', periods: [], message: 'Missing startDate or personId in message', token: event.data.token || null }, window.location.origin);
                     return;
                 }
 
